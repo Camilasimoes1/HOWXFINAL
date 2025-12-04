@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
-    <title>Day #61 - Api Quiz Game | AsmrProg</title>
+    <title>Quiz Game</title>
 </head>
 
 <body>
@@ -150,7 +150,7 @@
         } else {
             selectedButton.classList.add('incorrect');
             correctButton.classList.add('correct');
-            resultContainer.innerText = `Wrong! The correct answer was: ${decodeHTML(correctAnswer)}`;
+            resultContainer.innerText = `Errado! A resposta correta era: ${decodeHTML(correctAnswer)}`;
         }
 
         updateCurrentScore();
@@ -162,7 +162,7 @@
     }
 
     function updateCurrentScore() {
-        currentScoreDisplay.innerText = `Current Score: ${score}`;
+        currentScoreDisplay.innerText = `Pontuação Atual: ${score}`;
     }
 
     function disableButtons() {
@@ -173,9 +173,9 @@
     }
 
     function showResults() {
-        questionContainer.innerText = 'Quiz Finished!';
+        questionContainer.innerText = 'Quiz Finalizado!!';
         answersContainer.innerHTML = '';
-        resultContainer.innerText = `Your final score is ${score}`;
+        resultContainer.innerText = `Pontuação Atual ${score}`;
         updateHighScoreDisplay();
         progressContainer.innerText = '';
         const restartButton = document.createElement
