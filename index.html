@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Day #61 - Api Quiz Game | AsmrProg</title>
+</head>
+
+<body>
+
+    <div id="quiz-container">
+        <div id="game-setup">
+            <div>
+                <label for="category">Choose a Category:</label>
+                <select id="category">
+                    <option value="">Any Category</option>
+                </select>
+            </div>
+            <div>
+                <label for="amount">Number of Questions:</label>
+                <input type="number" id="amount" min="1" max="50" value="10">
+            </div>
+            <div>
+                <label for="difficulty">Select Difficulty:</label>
+                <select id="difficulty">
+                    <option value="">Any Difficulty</option>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+            <button id="start-btn">Start Game</button>
+        </div>
+        <div id="quiz" style="display: none;">
+            <div id="progress"></div>
+            <div id="currentScore"></div>
+            <div id="highScore"></div>
+            <div id="question"></div>
+            <div id="answers"></div>
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        
+    document.addEventListener('DOMContentLoaded', () => {
+
+    const questionContainer = document.getElementById('question');
+    const answersContainer = document.getElementById('answers');
+    const resultContainer = document.getElementById('result');
+    const progressContainer = document.getElementById('progress');
+    const currentScoreDisplay = document.getElementById('currentScore');
+    const highScoreDisplay = document.getElementById('highScore');
+    const gameSetupDiv = document.getElementById('game-setup');
+    const quizDiv = document.getElementById('quiz');
+    const categorySelect = document.getElementById('category');
+    const amountInput = document.getElementById('amount');
+    const difficultySelect = document.getElementById('difficulty');
+    const startButton = document.getElementById('start-btn');
+
+    let currentQuestions = [];
+    let score = 0;
+    let questionIndex = 0;
+    let highScore = parseInt(localStorage.getItem('HighScoreTrivia')) || 0;
+    let questionStartTime;
+    const baseScorePerQuestion = 1000;
+    const penaltyPerSecond = 10;
+
+    highScoreDisplay.innerText = `High Score: ${highScore}`;
+
+    function fetchCategories() {
+        fetch('https://opentdb.com/api_category.php').then(response => response.json()).then(data => {
+            data.trivia_categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                categorySelect.appendChild(option);
+            });
+        });
+    }
+
+    function startGame() {
+        const category = categorySelect.value;
+        const amount = amountInput.value;
+        const difficulty = difficultySelect.value;
+        fetchQuestions(amount, category, difficulty);
+        gameSetupDiv.style.display = 'none';
+        quizDiv.style.display = 'block';
+    }
+
+    function fetchQuestions(amount, category, difficulty) {
+        let url = `https://opentdb.com/api.php?amount=${amount}`;
+        if (category) url += `&category=${category}`;
+        if (difficulty) url += `&difficulty=${difficulty}`;
+        url += `&type=multiple`;
+
+        fetch(url).then(response => response.json()).then(data => {
+            currentQuestions = data.results;
+            questionIndex = 0;
+            score = 0;
+            displayQuestion();
+        }).catch(error => alert('Error:' + error));
+    }
+
+    function displayQuestion() {
+        if (questionIndex < currentQuestions.length) {
+            let currentQuestion = currentQuestions[questionIndex];
+            questionContainer.innerHTML = decodeHTML(currentQuestion.question);
+            displayAnswers(currentQuestion);
+            updateProgress();
+            questionStartTime = Date.now();
+        } else {
+            updateHighScore();
+            showResults();
+        }
+    }
+
+    function displayAnswers(question) {
+        answersContainer.innerHTML = '';
+        const answers = [...question.incorrect_answers, question.correct_answer];
+        shuffleArray(answers);
+
+        answers.forEach(answer => {
+            const button = document.createElement('button');
+            button.innerHTML = decodeHTML(answer);
+            button.className = 'answer-btn';
+            button.addEventListener('click', () => selectAnswer(button, question.correct_answer, answers));
+            answersContainer.appendChild(button);
+        });
+    }
+
+    function selectAnswer(selectedButton, correctAnswer, answers) {
+        const timeTaken = (Date.now() - questionStartTime) / 1000;
+        let scoreForThisQuestion = Math.max(baseScorePerQuestion - Math.floor(timeTaken) * penaltyPerSecond, 0);
+
+        disableButtons();
+        let correctButton;
+        answers.forEach(answer => {
+            if (decodeHTML(answer) === decodeHTML(correctAnswer)) {
+                correctButton = [...answersContainer.childNodes].find(button => button.innerHTML === decodeHTML(correctAnswer));
+            }
+        });
+
+        if (decodeHTML(selectedButton.innerHTML) === decodeHTML(correctAnswer)) {
+            score += scoreForThisQuestion;
+            selectedButton.classList.add('correct');
+            resultContainer.innerText = `Correct! + ${scoreForThisQuestion} Points`;
+        } else {
+            selectedButton.classList.add('incorrect');
+            correctButton.classList.add('correct');
+            resultContainer.innerText = `Wrong! The correct answer was: ${decodeHTML(correctAnswer)}`;
+        }
+
+        updateCurrentScore();
+        setTimeout(() => {
+            questionIndex++;
+            displayQuestion();
+            resultContainer.innerText = '';
+        }, 3000);
+    }
+
+    function updateCurrentScore() {
+        currentScoreDisplay.innerText = `Current Score: ${score}`;
+    }
+
+    function disableButtons() {
+        const buttons = answersContainer.getElementsByClassName('answer-btn');
+        for (let button of buttons) {
+            button.disabled = true;
+        }
+    }
+
+    function showResults() {
+        questionContainer.innerText = 'Quiz Finished!';
+        answersContainer.innerHTML = '';
+        resultContainer.innerText = `Your final score is ${score}`;
+        updateHighScoreDisplay();
+        progressContainer.innerText = '';
+        const restartButton = document.createElement
+        ('button');
+        restartButton.textContent = 'Restart Quiz';
+        restartButton.addEventListener('click', () => {
+            quizDiv.style.display = 'none';
+            gameSetupDiv.style.display = 'block';
+            fetchCategories();
+        });
+        answersContainer.appendChild(restartButton);
+    }
+
+    function updateHighScore() {
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('HighScoreTrivia', highScore.toString());
+            updateHighScoreDisplay();
+        }
+    }
+
+    function updateHighScoreDisplay() {
+        highScoreDisplay.innerText = `High Score: ${highScore}`;
+    }
+
+    function updateProgress() {
+        progressContainer.innerText = `Question ${questionIndex + 1}/${currentQuestions.length}`;
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function decodeHTML(html) {
+        var txt = document.createElement('textarea');
+        txt.innerHTML = html;
+        return txt.value;
+    }
+
+    startButton.addEventListener('click', startGame);
+
+    fetchCategories();
+
+});
+    </script>
+
+
+
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+body, html{
+    height: 100%;
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(#1c1917 50%, #ffb92a 50%);
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+#quiz-container{
+    width: 420px;
+    background-color: #fff;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    margin: 20px;
+}
+
+#game-setup div{
+    margin: 10px 0;
+}
+
+#game-setup label{
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #000;
+}
+
+#category, #amount, #difficulty{
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 1em;
+    color: #333;
+    background: #fff;
+}
+
+#start-btn{
+    padding: 12px 25px;
+    background-color: #1c1917;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1em;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.3s ease, transform 0.1s ease;
+    width: 100%;
+    margin-top: 20px;
+}
+
+#start-btn:hover{
+    background-color: #15aabf;
+    transform: scale(1.05);
+}
+
+#progress, #currentScore, #highScore{
+    margin-bottom: 10px;
+    font-size: 1em;
+    font-weight: bold;
+    color: #444;
+}
+
+#question{
+    font-size: 1em;
+    margin: 20px 0;
+    color: #5a5a5a;
+}
+
+.answer-btn{
+    width: calc(100% - 20px);
+    padding: 10px 20px;
+    margin-bottom: 12px;
+    background-color: #1c1917;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9em;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    transition: transform 0.1s ease;
+}
+
+.answer-btn:hover{
+    transform: scale(1.05);
+}
+
+.answer-btn:disabled, .answer-btn.correct, .answer-btn.incorrect{
+    cursor: default;
+    transform: none;
+}
+
+#result{
+    font-size: 1em;
+    color: #5a5a5a;
+    margin-top: 20px;
+}
+
+.correct{
+    background-color: #4caf50 !important;
+}
+
+.incorrect{
+    background-color: #f44336 !important;
+}
+
+button{
+    padding: 12px 15px;
+    background-color: #ff5722;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1em;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.3s ease, transform 0.1s ease;
+}
+
+button:hover{
+    background-color: #e64a19;
+    transform: scale(1.05);
+}
+    </style>
+</body>
+
+</html>
